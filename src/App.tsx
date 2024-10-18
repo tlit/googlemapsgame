@@ -1,5 +1,5 @@
 // Import necessary dependencies from React and other libraries
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 
@@ -35,15 +35,48 @@ const convertToLatLngLiteral = (coordinates: number[][]): google.maps.LatLngLite
   }));
 };
 
-// Helper function to process GeoJSON geometry
-const processGeometry = (geometry: any): google.maps.LatLngLiteral[][] => {
+// Update the return type of processGeometry
+const processGeometry = (geometry: any): google.maps.LatLngLiteral[][][] => {
   if (geometry.type === 'Polygon') {
-    return [convertToLatLngLiteral(geometry.coordinates[0])];
+    return [[convertToLatLngLiteral(geometry.coordinates[0])]];
   } else if (geometry.type === 'MultiPolygon') {
-    return geometry.coordinates.map((polygon: number[][][]) => convertToLatLngLiteral(polygon[0]));
+    return geometry.coordinates.map((polygon: number[][][]) => [convertToLatLngLiteral(polygon[0])]);
   }
   return [];
 };
+
+// Define color variables
+const colorRed = '#FF0000';
+const colorBlue = '#0000FF';
+const colorGreen = '#00FF00';
+const colorYellow = '#FFFF00';
+const colorPurple = '#800080';
+const colorOrange = '#FFA500';
+const colorCyan = '#00FFFF';
+const colorMagenta = '#FF00FF';
+const colorLime = '#32CD32';
+const colorPink = '#FFC0CB';
+const colorTeal = '#008080';
+const colorLavender = '#E6E6FA';
+const colorBrown = '#A52A2A';
+const colorBeige = '#F5F5DC';
+const colorMaroon = '#800000';
+const colorMint = '#98FF98';
+const colorOlive = '#808000';
+const colorApricot = '#FBCEB1';
+const colorNavy = '#000080';
+const colorCoral = '#FF7F50';
+
+// Create an array of colors
+const polygonColors = [
+  colorRed, colorBlue, colorGreen, colorYellow, colorPurple,
+  colorOrange, colorCyan, colorMagenta, colorLime, colorPink,
+  colorTeal, colorLavender, colorBrown, colorBeige, colorMaroon,
+  colorMint, colorOlive, colorApricot, colorNavy, colorCoral
+];
+
+// Helper function to get a random color from the array
+const getRandomColor = () => polygonColors[Math.floor(Math.random() * polygonColors.length)];
 
 // Main App component
 function App() {
@@ -53,7 +86,10 @@ function App() {
   const [inputValue, setInputValue] = useState(''); // Current input value
   const [message, setMessage] = useState(''); // Feedback message for the player
   const mapRef = useRef<google.maps.Map | null>(null); // Reference to the Google Map instance
-  const [polygons, setPolygons] = useState<google.maps.LatLngLiteral[][][]>([]); // Store country polygons
+  const [polygons, setPolygons] = useState<{ country: string; paths: google.maps.LatLngLiteral[][] }[]>([]);
+
+  // Use useMemo to create a stable reference for countryColors
+  const countryColors = useMemo(() => new Map<string, string>(), []);
 
   // Load the Google Maps JavaScript API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -84,9 +120,14 @@ function App() {
       if (data.length > 0) {
         // If the country is valid
         const country = data[0];
-        setCountries([...countries, countryName]); // Add country to the list
-        setScore(score + 1); // Increase score
+        setCountries(prevCountries => [...prevCountries, countryName]);
+        setScore(prevScore => prevScore + 1);
         setMessage(`Correct! ${countryName} added.`);
+
+        // Assign a color to the country if it doesn't have one
+        if (!countryColors.has(countryName)) {
+          countryColors.set(countryName, getRandomColor());
+        }
 
         // Pan and zoom the map to the country's location
         if (country.latlng && mapRef.current) {
@@ -99,7 +140,10 @@ function App() {
         const boundariesData = await boundariesResponse.json();
         if (boundariesData.length > 0 && boundariesData[0].geojson) {
           const newPolygons = processGeometry(boundariesData[0].geojson);
-          setPolygons([...polygons, ...newPolygons]); // Add new polygons to the list
+          setPolygons(prevPolygons => [
+            ...prevPolygons,
+            ...newPolygons.map(paths => ({ country: countryName, paths }))
+          ]);
         }
       } else {
         setMessage('Invalid country name. Try again!');
@@ -133,20 +177,22 @@ function App() {
         options={mapOptions}
         onLoad={onMapLoad}
       >
-        {/* Render polygons for each correctly guessed country */}
-        {polygons.map((paths, index) => (
-          <Polygon
-            key={index}
-            paths={paths}
-            options={{
-              fillColor: '#FF0000',
-              fillOpacity: 0.35,
-              strokeColor: '#FF0000',
-              strokeOpacity: 1,
-              strokeWeight: 2,
-            }}
-          />
-        ))}
+        {polygons.map(({ country, paths }, index) => {
+          const color = countryColors.get(country) || getRandomColor();
+          return (
+            <Polygon
+              key={`${country}-${index}`}
+              paths={paths}
+              options={{
+                fillColor: color,
+                fillOpacity: 0.35,
+                strokeColor: '#000000',
+                strokeOpacity: 1,
+                strokeWeight: 2,
+              }}
+            />
+          );
+        })}
       </GoogleMap>
       {/* Game interface overlay */}
       <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-md">
