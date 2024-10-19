@@ -1,8 +1,9 @@
 // Import necessary dependencies from React and other libraries
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import { processGeometry, getRandomColor } from './utils';
+import { darkenAndSaturate } from './colors';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -37,9 +38,7 @@ function App() {
   const [message, setMessage] = useState(''); // Feedback message for the player
   const mapRef = useRef<google.maps.Map | null>(null); // Reference to the Google Map instance
   const [polygons, setPolygons] = useState<{ country: string; paths: google.maps.LatLngLiteral[][] }[]>([]);
-
-  // Use useMemo to create a stable reference for countryColors
-  const countryColors = useMemo(() => new Map<string, string>(), []);
+  const colorMapRef = useRef<Map<string, string>>(new Map());
 
   // Load the Google Maps JavaScript API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -93,10 +92,6 @@ function App() {
         setScore(prevScore => prevScore + 1);
         setMessage(`Correct! ${capitalizedCountryName} added.`);
 
-        if (!countryColors.has(capitalizedCountryName)) {
-          countryColors.set(capitalizedCountryName, getRandomColor());
-        }
-
         if (country.latlng && mapRef.current) {
           mapRef.current.panTo({ lat: country.latlng[0], lng: country.latlng[1] });
           mapRef.current.setZoom(5);
@@ -112,14 +107,19 @@ function App() {
         const boundariesData = await boundariesResponse.json();
         if (boundariesData.length > 0 && boundariesData[0].geojson) {
           const newPolygons = processGeometry(boundariesData[0].geojson);
-          setPolygons(prevPolygons => [
-            ...prevPolygons,
-            ...newPolygons.map(paths => ({ country: capitalizedCountryName, paths }))
-          ]);
-          console.log(`Added polygons for ${capitalizedCountryName}:`, newPolygons); // Add this line for debugging
+          if (newPolygons.length > 0) {
+            setPolygons(prevPolygons => [
+              ...prevPolygons,
+              ...newPolygons.map(paths => ({ country: capitalizedCountryName, paths }))
+            ]);
+            console.log(`Added polygons for ${capitalizedCountryName}:`, newPolygons);
+          } else {
+            console.warn(`No valid polygons found for ${capitalizedCountryName}`);
+          }
         } else {
           console.warn(`No boundary data found for ${capitalizedCountryName}`);
         }
+        console.log('Boundaries data:', boundariesData);
       } else {
         setMessage('Invalid country name. Try again!');
       }
@@ -154,8 +154,12 @@ function App() {
         onLoad={onMapLoad}
       >
         {polygons.map(({ country, paths }, index) => {
-          const color = countryColors.get(country) || getRandomColor();
-          console.log(`Rendering polygon for ${country} with color ${color}`); // Add this line for debugging
+          if (!colorMapRef.current.has(country)) {
+            colorMapRef.current.set(country, getRandomColor(country));
+          }
+          const color = colorMapRef.current.get(country)!;
+          const strokeColor = darkenAndSaturate(color);
+
           return (
             <Polygon
               key={`${country}-${index}`}
@@ -163,9 +167,9 @@ function App() {
               options={{
                 fillColor: color,
                 fillOpacity: 0.35,
-                strokeColor: '#000000',
+                strokeColor: strokeColor,
                 strokeOpacity: 1,
-                strokeWeight: 2,
+                strokeWeight: 3,
               }}
             />
           );
