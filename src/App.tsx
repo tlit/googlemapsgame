@@ -1,9 +1,8 @@
 // Import necessary dependencies from React and other libraries
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
-import { countryColors } from './colors';
-import { convertToLatLngLiteral, processGeometry, getRandomColor } from './utils';
+import { processGeometry, getRandomColor } from './utils';
 
 // Define the style for the map container
 const mapContainerStyle = {
