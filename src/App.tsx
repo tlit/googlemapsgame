@@ -87,15 +87,12 @@ function App() {
       const data = await response.json();
 
       if (data.length > 0) {
-        const country = data[0];
-        setCountries(prevCountries => [...prevCountries, capitalizedCountryName]);
+        setCountries(prevCountries => {
+          const updatedCountries = [...prevCountries, capitalizedCountryName];
+          return updatedCountries.sort(); // Sort countries alphabetically
+        });
         setScore(prevScore => prevScore + 1);
         setMessage(`Correct! ${capitalizedCountryName} added.`);
-
-        if (country.latlng && mapRef.current) {
-          mapRef.current.panTo({ lat: country.latlng[0], lng: country.latlng[1] });
-          mapRef.current.setZoom(5);
-        }
 
         // Fetch country boundaries
         const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(capitalizedCountryName)}&polygon_geojson=1&format=json`);
@@ -112,14 +109,23 @@ function App() {
               ...prevPolygons,
               ...newPolygons.map(paths => ({ country: capitalizedCountryName, paths }))
             ]);
-            console.log(`Added polygons for ${capitalizedCountryName}:`, newPolygons);
+
+            // Calculate bounds for the country
+            const bounds = new google.maps.LatLngBounds();
+            newPolygons.forEach(paths => {
+              paths.forEach(path => {
+                path.forEach(latlng => bounds.extend(latlng));
+              });
+            });
+
+            // Fit the map to the bounds with a padding
+            mapRef.current?.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
           } else {
             console.warn(`No valid polygons found for ${capitalizedCountryName}`);
           }
         } else {
           console.warn(`No boundary data found for ${capitalizedCountryName}`);
         }
-        console.log('Boundaries data:', boundariesData);
       } else {
         setMessage('Invalid country name. Try again!');
       }
@@ -194,6 +200,14 @@ function App() {
           </button>
         </form>
         {message && <p className="mt-2 text-sm">{message}</p>}
+        {/* Alphabetized list of correct guesses */}
+        <div className="mt-4 max-h-40 overflow-y-auto">
+          <ul className="list-disc pl-5">
+            {countries.map((country, index) => (
+              <li key={index} className="text-sm">{country}</li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
