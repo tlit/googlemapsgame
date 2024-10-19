@@ -1,7 +1,8 @@
 // Import necessary dependencies from React and other libraries
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
+import { countryColors } from './colors';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -45,38 +46,8 @@ const processGeometry = (geometry: any): google.maps.LatLngLiteral[][][] => {
   return [];
 };
 
-// Define color variables
-const colorRed = '#FF0000';
-const colorBlue = '#0000FF';
-const colorGreen = '#00FF00';
-const colorYellow = '#FFFF00';
-const colorPurple = '#800080';
-const colorOrange = '#FFA500';
-const colorCyan = '#00FFFF';
-const colorMagenta = '#FF00FF';
-const colorLime = '#32CD32';
-const colorPink = '#FFC0CB';
-const colorTeal = '#008080';
-const colorLavender = '#E6E6FA';
-const colorBrown = '#A52A2A';
-const colorBeige = '#F5F5DC';
-const colorMaroon = '#800000';
-const colorMint = '#98FF98';
-const colorOlive = '#808000';
-const colorApricot = '#FBCEB1';
-const colorNavy = '#000080';
-const colorCoral = '#FF7F50';
-
-// Create an array of colors
-const polygonColors = [
-  colorRed, colorBlue, colorGreen, colorYellow, colorPurple,
-  colorOrange, colorCyan, colorMagenta, colorLime, colorPink,
-  colorTeal, colorLavender, colorBrown, colorBeige, colorMaroon,
-  colorMint, colorOlive, colorApricot, colorNavy, colorCoral
-];
-
 // Helper function to get a random color from the array
-const getRandomColor = () => polygonColors[Math.floor(Math.random() * polygonColors.length)];
+const getRandomColor = () => countryColors[Math.floor(Math.random() * countryColors.length)];
 
 // Main App component
 function App() {
@@ -101,42 +72,53 @@ function App() {
     mapRef.current = map;
   }, []);
 
+  // State variable to track loading status
+  const [isLoading, setIsLoading] = useState(false);
+
   // Handle form submission when a country is entered
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent the form from refreshing the page
-    const countryName = inputValue.trim(); // Remove whitespace from input
+    e.preventDefault();
+    const countryName = inputValue.trim();
     
-    // Check if the country has already been guessed
     if (countries.includes(countryName)) {
       setMessage('You already entered this country!');
       return;
     }
 
+    setIsLoading(true);
+    setMessage('');
+
     try {
       // Fetch country data from the REST Countries API
-      const response = await fetch(`https://restcountries.com/v3.1/name/${countryName}`);
+      const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}`);
       const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(`REST Countries API error: ${data.message || response.statusText}`);
+      }
+
       if (data.length > 0) {
-        // If the country is valid
         const country = data[0];
         setCountries(prevCountries => [...prevCountries, countryName]);
         setScore(prevScore => prevScore + 1);
         setMessage(`Correct! ${countryName} added.`);
 
-        // Assign a color to the country if it doesn't have one
         if (!countryColors.has(countryName)) {
           countryColors.set(countryName, getRandomColor());
         }
 
-        // Pan and zoom the map to the country's location
         if (country.latlng && mapRef.current) {
           mapRef.current.panTo({ lat: country.latlng[0], lng: country.latlng[1] });
           mapRef.current.setZoom(5);
         }
 
         // Fetch country boundaries and add polygon
-        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${countryName}&polygon_geojson=1&format=json`);
+        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&polygon_geojson=1&format=json`);
+        
+        if (!boundariesResponse.ok) {
+          throw new Error(`Nominatim API error: ${boundariesResponse.statusText}`);
+        }
+
         const boundariesData = await boundariesResponse.json();
         if (boundariesData.length > 0 && boundariesData[0].geojson) {
           const newPolygons = processGeometry(boundariesData[0].geojson);
@@ -144,16 +126,19 @@ function App() {
             ...prevPolygons,
             ...newPolygons.map(paths => ({ country: countryName, paths }))
           ]);
+        } else {
+          console.warn(`No boundary data found for ${countryName}`);
         }
       } else {
         setMessage('Invalid country name. Try again!');
       }
     } catch (error) {
       console.error('Error:', error);
-      setMessage('Error occurred. Please try again.');
+      setMessage(`Error occurred: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setIsLoading(false);
+      setInputValue('');
     }
-
-    setInputValue(''); // Clear the input field
   };
 
   // Show error message if the map fails to load
@@ -205,9 +190,10 @@ function App() {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Enter a country name"
             className="border border-gray-300 rounded-l px-4 py-2 w-full"
+            disabled={isLoading}
           />
-          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600">
-            <MapPin size={24} />
+          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600" disabled={isLoading}>
+            {isLoading ? 'Loading...' : <MapPin size={24} />}
           </button>
         </form>
         {message && <p className="mt-2 text-sm">{message}</p>}
