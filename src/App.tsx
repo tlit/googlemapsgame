@@ -4,6 +4,7 @@ import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import { processGeometry, getRandomColor } from './utils';
 import { darkenAndSaturate } from './colors';
+import { countryNames } from './countries';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -65,10 +66,19 @@ function App() {
   // Handle form submission when a country is entered
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const countryName = inputValue.trim();
-    const capitalizedCountryName = countryName.charAt(0).toUpperCase() + countryName.slice(1);
-    
-    if (countries.includes(capitalizedCountryName)) {
+    const countryName = inputValue.trim().toLowerCase();
+    const standardizedCountryName = Object.keys(countryNames).find(
+      key => key.toLowerCase() === countryName
+    );
+
+    if (!standardizedCountryName) {
+      setMessage('Invalid country name. Try again!');
+      return;
+    }
+
+    const matchedCountryName = countryNames[standardizedCountryName];
+
+    if (countries.includes(matchedCountryName)) {
       setMessage('You already entered this country!');
       return;
     }
@@ -78,7 +88,7 @@ function App() {
 
     try {
       // Fetch country data from the REST Countries API
-      const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}`);
+      const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(standardizedCountryName)}`);
       
       if (!response.ok) {
         throw new Error(`REST Countries API error: ${response.status} ${response.statusText}`);
@@ -88,14 +98,14 @@ function App() {
 
       if (data.length > 0) {
         setCountries(prevCountries => {
-          const updatedCountries = [...prevCountries, capitalizedCountryName];
+          const updatedCountries = [...prevCountries, matchedCountryName];
           return updatedCountries.sort(); // Sort countries alphabetically
         });
         setScore(prevScore => prevScore + 1);
-        setMessage(`Correct! ${capitalizedCountryName} added.`);
+        setMessage(`Correct! ${matchedCountryName} added.`);
 
         // Fetch country boundaries
-        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(capitalizedCountryName)}&polygon_geojson=1&format=json`);
+        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(matchedCountryName)}&polygon_geojson=1&format=json`);
         
         if (!boundariesResponse.ok) {
           throw new Error(`Nominatim API error: ${boundariesResponse.status} ${boundariesResponse.statusText}`);
@@ -107,7 +117,7 @@ function App() {
           if (newPolygons.length > 0) {
             setPolygons(prevPolygons => [
               ...prevPolygons,
-              ...newPolygons.map(paths => ({ country: capitalizedCountryName, paths }))
+              ...newPolygons.map(paths => ({ country: matchedCountryName, paths }))
             ]);
 
             // Calculate bounds for the country
@@ -121,10 +131,10 @@ function App() {
             // Fit the map to the bounds with a padding
             mapRef.current?.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
           } else {
-            console.warn(`No valid polygons found for ${capitalizedCountryName}`);
+            console.warn(`No valid polygons found for ${matchedCountryName}`);
           }
         } else {
-          console.warn(`No boundary data found for ${capitalizedCountryName}`);
+          console.warn(`No boundary data found for ${matchedCountryName}`);
         }
       } else {
         setMessage('Invalid country name. Try again!');
