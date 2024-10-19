@@ -24,4 +24,16 @@ export const processGeometry = (geometry: GeoJSONGeometry): google.maps.LatLngLi
 };
 
 // Helper function to get a random color from the array
-export const getRandomColor = (): string => countryColors[Math.floor(Math.random() * countryColors.length)];
+export const getRandomColor = (countryName: string): string => {
+  const storedColors = JSON.parse(localStorage.getItem('countryColors') || '{}');
+  if (storedColors[countryName]) {
+    return storedColors[countryName];
+  }
+
+  const colorsArray = Array.from(countryColors.values());
+  const randomColor = colorsArray[Math.floor(Math.random() * colorsArray.length)];
+  storedColors[countryName] = randomColor;
+  localStorage.setItem('countryColors', JSON.stringify(storedColors));
+
+  return randomColor;
+};
