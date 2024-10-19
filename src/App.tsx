@@ -3,6 +3,7 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import { countryColors } from './colors';
+import { convertToLatLngLiteral, processGeometry, getRandomColor } from './utils';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -27,27 +28,6 @@ const mapOptions = {
     },
   ],
 };
-
-// Helper function to convert GeoJSON coordinates to Google Maps LatLngLiteral
-const convertToLatLngLiteral = (coordinates: number[][]): google.maps.LatLngLiteral[] => {
-  return coordinates.map(coord => ({
-    lat: coord[1],
-    lng: coord[0],
-  }));
-};
-
-// Update the return type of processGeometry
-const processGeometry = (geometry: any): google.maps.LatLngLiteral[][][] => {
-  if (geometry.type === 'Polygon') {
-    return [[convertToLatLngLiteral(geometry.coordinates[0])]];
-  } else if (geometry.type === 'MultiPolygon') {
-    return geometry.coordinates.map((polygon: number[][][]) => [convertToLatLngLiteral(polygon[0])]);
-  }
-  return [];
-};
-
-// Helper function to get a random color from the array
-const getRandomColor = () => countryColors[Math.floor(Math.random() * countryColors.length)];
 
 // Main App component
 function App() {
@@ -91,11 +71,12 @@ function App() {
     try {
       // Fetch country data from the REST Countries API
       const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}`);
-      const data = await response.json();
-
+      
       if (!response.ok) {
-        throw new Error(`REST Countries API error: ${data.message || response.statusText}`);
+        throw new Error(`REST Countries API error: ${response.status} ${response.statusText}`);
       }
+
+      const data = await response.json();
 
       if (data.length > 0) {
         const country = data[0];
@@ -112,11 +93,11 @@ function App() {
           mapRef.current.setZoom(5);
         }
 
-        // Fetch country boundaries and add polygon
+        // Fetch country boundaries
         const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&polygon_geojson=1&format=json`);
         
         if (!boundariesResponse.ok) {
-          throw new Error(`Nominatim API error: ${boundariesResponse.statusText}`);
+          throw new Error(`Nominatim API error: ${boundariesResponse.status} ${boundariesResponse.statusText}`);
         }
 
         const boundariesData = await boundariesResponse.json();
@@ -126,6 +107,7 @@ function App() {
             ...prevPolygons,
             ...newPolygons.map(paths => ({ country: countryName, paths }))
           ]);
+          console.log(`Added polygons for ${countryName}:`, newPolygons); // Add this line for debugging
         } else {
           console.warn(`No boundary data found for ${countryName}`);
         }
@@ -164,6 +146,7 @@ function App() {
       >
         {polygons.map(({ country, paths }, index) => {
           const color = countryColors.get(country) || getRandomColor();
+          console.log(`Rendering polygon for ${country} with color ${color}`); // Add this line for debugging
           return (
             <Polygon
               key={`${country}-${index}`}
