@@ -1,5 +1,5 @@
 // Import necessary dependencies from React and other libraries
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Polygon } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import { processGeometry, getRandomColor } from './utils';
@@ -54,12 +54,22 @@ function App() {
   // State variable to track loading status
   const [isLoading, setIsLoading] = useState(false);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Add this useEffect hook
+  useEffect(() => {
+    if (!isLoading) {
+      inputRef.current?.focus();
+    }
+  }, [isLoading]);
+
   // Handle form submission when a country is entered
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const countryName = inputValue.trim();
+    const capitalizedCountryName = countryName.charAt(0).toUpperCase() + countryName.slice(1);
     
-    if (countries.includes(countryName)) {
+    if (countries.includes(capitalizedCountryName)) {
       setMessage('You already entered this country!');
       return;
     }
@@ -79,12 +89,12 @@ function App() {
 
       if (data.length > 0) {
         const country = data[0];
-        setCountries(prevCountries => [...prevCountries, countryName]);
+        setCountries(prevCountries => [...prevCountries, capitalizedCountryName]);
         setScore(prevScore => prevScore + 1);
-        setMessage(`Correct! ${countryName} added.`);
+        setMessage(`Correct! ${capitalizedCountryName} added.`);
 
-        if (!countryColors.has(countryName)) {
-          countryColors.set(countryName, getRandomColor());
+        if (!countryColors.has(capitalizedCountryName)) {
+          countryColors.set(capitalizedCountryName, getRandomColor());
         }
 
         if (country.latlng && mapRef.current) {
@@ -93,7 +103,7 @@ function App() {
         }
 
         // Fetch country boundaries
-        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&polygon_geojson=1&format=json`);
+        const boundariesResponse = await fetch(`https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(capitalizedCountryName)}&polygon_geojson=1&format=json`);
         
         if (!boundariesResponse.ok) {
           throw new Error(`Nominatim API error: ${boundariesResponse.status} ${boundariesResponse.statusText}`);
@@ -104,11 +114,11 @@ function App() {
           const newPolygons = processGeometry(boundariesData[0].geojson);
           setPolygons(prevPolygons => [
             ...prevPolygons,
-            ...newPolygons.map(paths => ({ country: countryName, paths }))
+            ...newPolygons.map(paths => ({ country: capitalizedCountryName, paths }))
           ]);
-          console.log(`Added polygons for ${countryName}:`, newPolygons); // Add this line for debugging
+          console.log(`Added polygons for ${capitalizedCountryName}:`, newPolygons); // Add this line for debugging
         } else {
-          console.warn(`No boundary data found for ${countryName}`);
+          console.warn(`No boundary data found for ${capitalizedCountryName}`);
         }
       } else {
         setMessage('Invalid country name. Try again!');
@@ -167,6 +177,7 @@ function App() {
         <p className="mb-2">Score: {score}</p>
         <form onSubmit={handleSubmit} className="flex items-center">
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
