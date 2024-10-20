@@ -6,6 +6,7 @@ import { processGeometry, getRandomColor } from './utils';
 import { darkenAndSaturate } from './colors';
 import { countryNames } from './countries';
 import { TEST_IDS } from './testIds';
+import simplify from 'simplify-js';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -29,6 +30,17 @@ const mapOptions = {
       stylers: [{ visibility: 'off' }], // Hide country labels on the map
     },
   ],
+};
+
+// Function to process and simplify geometry
+const processAndSimplifyGeometry = (geojson: any) => {
+  const polygons = processGeometry(geojson);
+  return polygons.map(paths => 
+    paths.map(path => 
+      simplify(path.map(point => ({ x: point.lng, y: point.lat })), 0.03)
+        .map(simplifiedPoint => ({ lat: simplifiedPoint.y, lng: simplifiedPoint.x }))
+    )
+  );
 };
 
 // Main App component
@@ -114,7 +126,7 @@ function App() {
 
         const boundariesData = await boundariesResponse.json();
         if (boundariesData.length > 0 && boundariesData[0].geojson) {
-          const newPolygons = processGeometry(boundariesData[0].geojson);
+          const newPolygons = processAndSimplifyGeometry(boundariesData[0].geojson);
           if (newPolygons.length > 0) {
             setPolygons(prevPolygons => [
               ...prevPolygons,
