@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react';
 import { processGeometry, getRandomColor } from './utils';
 import { darkenAndSaturate } from './colors';
 import { countryNames } from './countries';
+import { TEST_IDS } from './testIds';
 
 // Define the style for the map container
 const mapContainerStyle = {
@@ -72,7 +73,7 @@ function App() {
     );
 
     if (!standardizedCountryName) {
-      setMessage('Invalid country name. Try again!');
+      setMessage(`Invalid country name: "${inputValue}". Try again!`);
       return;
     }
 
@@ -137,7 +138,7 @@ function App() {
           console.warn(`No boundary data found for ${matchedCountryName}`);
         }
       } else {
-        setMessage('Invalid country name. Try again!');
+        setMessage(`No response.`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -160,7 +161,7 @@ function App() {
 
   // Render the main application
   return (
-    <div className="relative h-screen">
+    <div className="relative h-screen" data-testid={TEST_IDS.APP_CONTAINER}>
       {/* Google Map component */}
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
@@ -168,6 +169,7 @@ function App() {
         zoom={2}
         options={mapOptions}
         onLoad={onMapLoad}
+        data-testid={TEST_IDS.GOOGLE_MAP}
       >
         {polygons.map(({ country, paths }, index) => {
           if (!colorMapRef.current.has(country)) {
@@ -187,15 +189,16 @@ function App() {
                 strokeOpacity: 1,
                 strokeWeight: 3,
               }}
+              data-testid={TEST_IDS.POLYGON(country)}
             />
           );
         })}
       </GoogleMap>
       {/* Game interface overlay */}
-      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-2">Country Game</h1>
-        <p className="mb-2">Score: {score}</p>
-        <form onSubmit={handleSubmit} className="flex items-center">
+      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-md" data-testid={TEST_IDS.GAME_INTERFACE}>
+        <h1 className="text-2xl font-bold mb-2" data-testid={TEST_IDS.GAME_TITLE}>Country Game</h1>
+        <p className="mb-2" data-testid={TEST_IDS.SCORE_DISPLAY}>Score: {score}</p>
+        <form onSubmit={handleSubmit} className="flex items-center" data-testid={TEST_IDS.COUNTRY_FORM}>
           <input
             ref={inputRef}
             type="text"
@@ -204,17 +207,23 @@ function App() {
             placeholder="Enter a country name"
             className="border border-gray-300 rounded-l px-4 py-2 w-full"
             disabled={isLoading}
+            data-testid={TEST_IDS.COUNTRY_INPUT}
           />
-          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600" disabled={isLoading}>
+          <button
+            type="submit"
+            className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600"
+            disabled={isLoading}
+            data-testid={TEST_IDS.SUBMIT_BUTTON}
+          >
             {isLoading ? 'Loading...' : <MapPin size={24} />}
           </button>
         </form>
-        {message && <p className="mt-2 text-sm">{message}</p>}
+        {message && <p className="mt-2 text-sm" data-testid={TEST_IDS.FEEDBACK_MESSAGE}>{message}</p>}
         {/* Alphabetized list of correct guesses */}
-        <div className="mt-4 max-h-40 overflow-y-auto">
+        <div className="mt-4 max-h-40 overflow-y-auto" data-testid={TEST_IDS.COUNTRY_LIST}>
           <ul className="list-disc pl-5">
             {countries.map((country, index) => (
-              <li key={index} className="text-sm">{country}</li>
+              <li key={index} className="text-sm" data-testid={TEST_IDS.COUNTRY_ITEM(index)}>{country}</li>
             ))}
           </ul>
         </div>
