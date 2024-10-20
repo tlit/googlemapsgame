@@ -2,11 +2,12 @@ import { describe, it, expect, vi, Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import App from './App'
+import { TEST_IDS } from './testIds'
 
 // Mock the Google Maps API loader
 vi.mock('@react-google-maps/api', () => ({
   useJsApiLoader: () => ({ isLoaded: true, loadError: null }),
-  GoogleMap: () => <div data-testid="google-map" />,
+  GoogleMap: () => <div data-testid={TEST_IDS.GOOGLE_MAP} />,
   Polygon: () => null,
 }))
 
@@ -21,7 +22,7 @@ describe('App component', () => {
 
   it('renders the Google Map component', () => {
     render(<App />)
-    const mapElement = screen.getByTestId('google-map')
+    const mapElement = screen.getByTestId(TEST_IDS.GOOGLE_MAP)
     expect(mapElement).toBeInTheDocument()
   })
 
@@ -37,15 +38,15 @@ describe('App component', () => {
 
     render(<App />)
 
-    const input = screen.getByPlaceholderText('Enter a country name')
-    const submitButton = screen.getByRole('button')
+    const input = screen.getByTestId(TEST_IDS.COUNTRY_INPUT)
+    const submitButton = screen.getByTestId(TEST_IDS.SUBMIT_BUTTON)
 
     // First submission
     fireEvent.change(input, { target: { value: 'France' } })
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Correct! France added.')).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.FEEDBACK_MESSAGE)).toHaveTextContent('Correct! France added.')
     })
 
     // Second submission (duplicate)
@@ -53,26 +54,26 @@ describe('App component', () => {
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText('You already entered this country!')).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.FEEDBACK_MESSAGE)).toHaveTextContent('You already entered this country!')
     })
   })
 
   it('handles invalid country name', async () => {
     (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ([])
+      json: async () => ([]),
     });
 
     render(<App />);
 
-    const input = screen.getByPlaceholderText('Enter a country name');
-    const submitButton = screen.getByRole('button');
+    const input = screen.getByTestId(TEST_IDS.COUNTRY_INPUT);
+    const submitButton = screen.getByTestId(TEST_IDS.SUBMIT_BUTTON);
 
     fireEvent.change(input, { target: { value: 'abc' } });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid country name. Try again!')).toBeInTheDocument();
+      expect(screen.getByTestId(TEST_IDS.FEEDBACK_MESSAGE)).toHaveTextContent('Invalid country name: "abc". Try again!')
     });
   });
 })
